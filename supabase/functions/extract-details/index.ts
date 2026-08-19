@@ -21,15 +21,51 @@ const SCHEMA_FIELDS = [
   "application_status",
 ];
 
+function decodeXmlEntities(s: string): string {
+  return s
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
+// hwpx section XML: text lives in <hp:t> runs inside <hp:p> paragraphs.
+// Preview/PrvText.txt is capped short, so read the full section body instead.
+function hwpxSectionXmlToText(xml: string): string {
+  const paragraphs = xml.split(/<hp:p\s/);
+  const lines: string[] = [];
+  const runRe = /<hp:t(?:\s[^>]*)?>([^<]*)<\/hp:t>/g;
+  for (const p of paragraphs) {
+    let line = "";
+    let m: RegExpExecArray | null;
+    runRe.lastIndex = 0;
+    while ((m = runRe.exec(p)) !== null) line += m[1];
+    line = decodeXmlEntities(line).trim();
+    if (line) lines.push(line);
+  }
+  return lines.join("\n");
+}
+
 async function extractHwpxText(url: string): Promise<string | null> {
   try {
     const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
     if (!res.ok) return null;
     const buf = await res.arrayBuffer();
     const zip = await JSZip.loadAsync(buf);
-    const file = zip.file("Preview/PrvText.txt");
-    if (!file) return null;
-    return await file.async("text");
+
+    const sectionFiles = Object.keys(zip.files)
+      .filter((name) => /^Contents\/section\d+\.xml$/.test(name))
+      .sort();
+    if (sectionFiles.length === 0) return null;
+
+    const texts: string[] = [];
+    for (const name of sectionFiles) {
+      const xml = await zip.file(name)!.async("text");
+      const text = hwpxSectionXmlToText(xml);
+      if (text) texts.push(text);
+    }
+    return texts.join("\n\n") || null;
   } catch {
     return null;
   }
@@ -43,12 +79,12 @@ async function gatherAttachmentText(attachments: { name: string; url: string }[]
     const text = await extractHwpxText(att.url);
     if (text) parts.push(`--- ${att.name} ---\n${text}`);
   }
-  return parts.join("\n\n").slice(0, 12000);
+  return parts.join("\n\n").slice(0, 14000);
 }
 
 async function extractFields(notice: any, attachmentText: string) {
   const today = new Date().toISOString().slice(0, 10);
-  const combinedBody = [notice.body_text ?? "", attachmentText].filter(Boolean).join("\n\n=== ATTACHMENT TEXT ===\n\n").slice(0, 16000);
+  const combinedBody = [notice.body_text ?? "", attachmentText].filter(Boolean).join("\n\n=== ATTACHMENT TEXT ===\n\n").slice(0, 20000);
 
   const prompt = `You extract structured facts from a Korean government (MSIT) business-support notice. Only use information present in the text; if a field isn't mentioned, use null. Do not guess or invent numbers.
 

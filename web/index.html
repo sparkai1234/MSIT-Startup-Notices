@@ -166,6 +166,12 @@ select#companyFilter {
   font-weight: 600;
   white-space: nowrap;
 }
+.badge.dday {
+  background: var(--warn-bg);
+  color: var(--warn);
+  font-family: "Space Grotesk", sans-serif;
+  font-variant-numeric: tabular-nums;
+}
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -251,7 +257,6 @@ select#companyFilter {
     <div class="tabs" id="statusTabs">
       <button class="tab active" data-status="">전체</button>
       <button class="tab" data-status="open">접수중</button>
-      <button class="tab" data-status="upcoming">접수예정</button>
       <button class="tab" data-status="closed">마감</button>
     </div>
     <select id="companyFilter">
@@ -287,7 +292,7 @@ function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
-const statusLabel = { open: "접수중", upcoming: "접수예정", closed: "마감", unknown: "미확인" };
+const statusLabel = { open: "접수중", closed: "마감", unknown: "미확인" };
 
 function computeStatus(n) {
   // Deadlines are real dates, so compute freshness live instead of trusting a status
@@ -296,7 +301,17 @@ function computeStatus(n) {
     const today = new Date().toISOString().slice(0, 10);
     return n.application_deadline >= today ? "open" : "closed";
   }
-  return n.application_status ?? "unknown";
+  return n.application_status === "closed" ? "closed" : "unknown";
+}
+
+function dDayLabel(deadline) {
+  if (!deadline) return null;
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const today = new Date(new Date().toISOString().slice(0, 10));
+  const due = new Date(deadline);
+  const days = Math.round((due - today) / msPerDay);
+  if (days < 0) return null;
+  return days === 0 ? "D-day" : `D-${days}`;
 }
 
 async function loadCompanies() {
@@ -347,6 +362,7 @@ async function render() {
 
   listEl.innerHTML = notices.map((n) => {
     const status = computeStatus(n);
+    const dDay = status === "open" ? dDayLabel(n.application_deadline) : null;
     const facts = [
       factRow("총 사업예산", n.total_budget),
       factRow("기업당 지원한도", n.support_cap_per_company),
@@ -368,6 +384,7 @@ async function render() {
       </div>
       <div class="meta">
         <span class="status-pill ${escapeHtml(status)}">${escapeHtml(statusLabel[status] ?? status)}</span>
+        ${dDay ? `<span class="badge dday">${escapeHtml(dDay)}</span>` : ""}
         ${n.dept ? `<span>${escapeHtml(n.dept)}</span>` : ""}
         ${n.posted_at ? `<span>${escapeHtml(n.posted_at)}</span>` : ""}
       </div>
