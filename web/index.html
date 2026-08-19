@@ -241,8 +241,49 @@ select#companyFilter {
   text-align: center;
 }
 
+.search-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.search-row input {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 14px;
+  font-family: inherit;
+}
+.search-row input::placeholder { color: var(--muted); }
+.search-row button {
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.search-row button.ghost {
+  background: var(--surface);
+  color: var(--muted);
+  border-color: var(--border);
+  font-weight: 500;
+}
+.search-status {
+  color: var(--muted);
+  font-size: 12.5px;
+  margin: 10px 0 -6px;
+}
+
 @media (max-width: 520px) {
   select#companyFilter { margin-left: 0; width: 100%; }
+  .search-row { flex-wrap: wrap; }
 }
 </style>
 
@@ -252,6 +293,12 @@ select#companyFilter {
     <h1>MSIT Notice Matcher</h1>
     <p class="sub">과학기술정보통신부 사업공고를 자동 수집하고, 예산·자격·마감일을 추출해 포트폴리오사와의 적합도를 AI로 채점합니다.</p>
   </header>
+
+  <div class="search-row">
+    <input type="text" id="searchInput" placeholder="무엇을 찾고 계신가요? (예: GPU 지원, 블록체인 스타트업 바우처, 해외 진출 지원)" />
+    <button id="searchBtn" type="button">검색</button>
+    <button id="searchClearBtn" type="button" class="ghost" hidden>지우기</button>
+  </div>
 
   <div class="controls">
     <div class="tabs" id="statusTabs">
@@ -273,6 +320,19 @@ const ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 
 let currentStatus = "";
 let currentCompany = "";
+let activeSearch = null; // { query, results } when a semantic search is active
+
+async function semanticSearch(query) {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/search-notices`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query, matchCount: 30 }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data.results ?? [];
+}
 
 async function sb(path) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -340,7 +400,9 @@ async function render() {
 
   let notices = [];
   try {
-    if (currentCompany) {
+    if (activeSearch) {
+      notices = activeSearch.results;
+    } else if (currentCompany) {
       const matches = await sb(
         `notice_matches?select=notice_id,relevance_score,rationale,notices(*)&company_id=eq.${currentCompany}&order=relevance_score.desc&limit=150`
       );
@@ -355,12 +417,16 @@ async function render() {
 
   if (currentStatus) notices = notices.filter((n) => computeStatus(n) === currentStatus);
 
+  const searchStatusHtml = activeSearch
+    ? `<div class="search-status">"${escapeHtml(activeSearch.query)}" 의미 검색 결과 ${notices.length}건</div>`
+    : "";
+
   if (!notices.length) {
-    listEl.innerHTML = '<div class="empty">해당하는 공고가 없습니다.</div>';
+    listEl.innerHTML = searchStatusHtml + '<div class="empty">해당하는 공고가 없습니다.</div>';
     return;
   }
 
-  listEl.innerHTML = notices.map((n) => {
+  listEl.innerHTML = searchStatusHtml + notices.map((n) => {
     const status = computeStatus(n);
     const dDay = status === "open" ? dDayLabel(n.application_deadline) : null;
     const facts = [
@@ -407,6 +473,36 @@ document.getElementById("statusTabs").addEventListener("click", (e) => {
 
 document.getElementById("companyFilter").addEventListener("change", (e) => {
   currentCompany = e.target.value;
+  render();
+});
+
+async function runSearch() {
+  const input = document.getElementById("searchInput");
+  const query = input.value.trim();
+  if (!query) return;
+
+  const listEl = document.getElementById("list");
+  listEl.innerHTML = '<div class="empty">의미 검색 중…</div>';
+  document.getElementById("searchClearBtn").hidden = false;
+
+  try {
+    const results = await semanticSearch(query);
+    activeSearch = { query, results };
+  } catch (e) {
+    listEl.innerHTML = `<div class="empty">검색 실패: ${escapeHtml(e.message)}</div>`;
+    return;
+  }
+  render();
+}
+
+document.getElementById("searchBtn").addEventListener("click", runSearch);
+document.getElementById("searchInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") runSearch();
+});
+document.getElementById("searchClearBtn").addEventListener("click", () => {
+  activeSearch = null;
+  document.getElementById("searchInput").value = "";
+  document.getElementById("searchClearBtn").hidden = true;
   render();
 });
 
