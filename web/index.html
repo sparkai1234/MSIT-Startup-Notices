@@ -289,6 +289,16 @@ function escapeHtml(s) {
 
 const statusLabel = { open: "접수중", upcoming: "접수예정", closed: "마감", unknown: "미확인" };
 
+function computeStatus(n) {
+  // Deadlines are real dates, so compute freshness live instead of trusting a status
+  // written once at extraction time (which goes stale the moment the deadline passes).
+  if (n.application_deadline) {
+    const today = new Date().toISOString().slice(0, 10);
+    return n.application_deadline >= today ? "open" : "closed";
+  }
+  return n.application_status ?? "unknown";
+}
+
 async function loadCompanies() {
   try {
     const companies = await sb("portfolio_companies?select=id,name&active=eq.true&order=name");
@@ -320,15 +330,15 @@ async function render() {
         `notice_matches?select=notice_id,relevance_score,rationale,notices(*)&company_id=eq.${currentCompany}&order=relevance_score.desc&limit=150`
       );
       notices = matches.filter((m) => m.notices).map((m) => ({ ...m.notices, relevance_score: m.relevance_score, rationale: m.rationale }));
-      if (currentStatus) notices = notices.filter((n) => n.application_status === currentStatus);
     } else {
-      const statusFilter = currentStatus ? `&application_status=eq.${currentStatus}` : "";
-      notices = await sb(`notices?select=*${statusFilter}&order=posted_at.desc&limit=150`);
+      notices = await sb(`notices?select=*&order=posted_at.desc&limit=150`);
     }
   } catch (e) {
     listEl.innerHTML = `<div class="empty">불러오기 실패: ${escapeHtml(e.message)}</div>`;
     return;
   }
+
+  if (currentStatus) notices = notices.filter((n) => computeStatus(n) === currentStatus);
 
   if (!notices.length) {
     listEl.innerHTML = '<div class="empty">해당하는 공고가 없습니다.</div>';
@@ -336,7 +346,7 @@ async function render() {
   }
 
   listEl.innerHTML = notices.map((n) => {
-    const status = n.application_status ?? "unknown";
+    const status = computeStatus(n);
     const facts = [
       factRow("총 사업예산", n.total_budget),
       factRow("기업당 지원한도", n.support_cap_per_company),
