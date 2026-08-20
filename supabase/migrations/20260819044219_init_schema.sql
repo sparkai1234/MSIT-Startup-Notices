@@ -1,6 +1,6 @@
 create table notices (
   id bigserial primary key,
-  ntt_seq_no text not null unique,
+  ntt_seq_no text not null,
   bbs_seq_no text not null,
   board text not null,
   title text not null,
@@ -12,7 +12,8 @@ create table notices (
   raw_html text,
   body_text text,
   attachments jsonb default '[]'::jsonb,
-  fetched_at timestamptz not null default now()
+  fetched_at timestamptz not null default now(),
+  unique(board, ntt_seq_no)
 );
 
 create table portfolio_companies (
@@ -48,15 +49,3 @@ create table scrape_runs (
   ok boolean,
   error text
 );
-
-create index idx_notices_posted_at on notices(posted_at desc);
-create index idx_matches_company on notice_matches(company_id, relevance_score desc);
-
-alter table notices enable row level security;
-alter table portfolio_companies enable row level security;
-alter table notice_matches enable row level security;
-alter table scrape_runs enable row level security;
-
-create policy "public read notices" on notices for select using (true);
-create policy "public read companies" on portfolio_companies for select using (true);
-create policy "public read matches" on notice_matches for select using (true);

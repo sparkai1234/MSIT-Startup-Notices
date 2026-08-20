@@ -1,0 +1,14 @@
+alter table notices add column if not exists total_budget text;
+alter table notices add column if not exists support_cap_per_company text;
+alter table notices add column if not exists self_funding_ratio text;
+alter table notices add column if not exists actual_support_amount text;
+alter table notices add column if not exists support_type text;
+alter table notices add column if not exists payment_method text;
+alter table notices add column if not exists selection_scale text;
+alter table notices add column if not exists project_period text;
+alter table notices add column if not exists eligibility text;
+alter table notices add column if not exists application_deadline date;
+alter table notices add column if not exists application_status text;
+alter table notices add column if not exists extraction_notes text;
+alter table notices add column if not exists extracted_at timestamptz;
+alter table notices add column if not exists extraction_model text;
