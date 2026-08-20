@@ -6,6 +6,11 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY")!;
 const MODEL = "gemini-3.6-flash";
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "content-type, authorization",
+};
+
 async function scoreMatch(notice: any, company: any) {
   const prompt = `You evaluate whether a Korean government (MSIT) notice is relevant to a startup.
 
@@ -43,16 +48,27 @@ Respond ONLY with JSON: {"score": <int>, "rationale": "<one sentence in Korean>"
   return { score: Math.max(0, Math.min(100, Math.round(parsed.score ?? 0))), rationale: parsed.rationale ?? "" };
 }
 
-Deno.serve(async (_req: Request) => {
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
+
+  let params: { limitPairs?: number; noticeLimit?: number } = {};
+  try {
+    params = await req.json();
+  } catch {
+    // defaults
+  }
+  const limitPairs = params.limitPairs ?? 15;
+  const noticeLimit = params.noticeLimit ?? 50;
+
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
   const { data: companies, error: cErr } = await supabase
     .from("portfolio_companies")
     .select("*")
     .eq("active", true);
-  if (cErr) return new Response(JSON.stringify({ error: cErr.message }), { status: 500 });
+  if (cErr) return new Response(JSON.stringify({ error: cErr.message }), { status: 500, headers: CORS_HEADERS });
   if (!companies || companies.length === 0) {
-    return new Response(JSON.stringify({ message: "no active portfolio companies" }));
+    return new Response(JSON.stringify({ message: "no active portfolio companies", scored: 0, remaining: 0 }), { headers: CORS_HEADERS });
   }
 
   const { data: existingMatches } = await supabase
@@ -65,33 +81,39 @@ Deno.serve(async (_req: Request) => {
     .select("*")
     .or("application_status.is.null,application_status.neq.closed")
     .order("posted_at", { ascending: false })
-    .limit(50);
-  if (nErr) return new Response(JSON.stringify({ error: nErr.message }), { status: 500 });
+    .limit(noticeLimit);
+  if (nErr) return new Response(JSON.stringify({ error: nErr.message }), { status: 500, headers: CORS_HEADERS });
 
-  let scored = 0;
-  const errors: string[] = [];
+  const pending: { notice: any; company: any }[] = [];
   for (const notice of notices ?? []) {
     for (const company of companies) {
       const key = `${notice.id}:${company.id}`;
-      if (matchedSet.has(key)) continue;
-
-      try {
-        const { score, rationale } = await scoreMatch(notice, company);
-        await supabase.from("notice_matches").insert({
-          notice_id: notice.id,
-          company_id: company.id,
-          relevance_score: score,
-          rationale,
-          model: MODEL,
-        });
-        scored++;
-      } catch (e) {
-        errors.push(`notice=${notice.id} company=${company.id}: ${String(e)}`);
-      }
+      if (!matchedSet.has(key)) pending.push({ notice, company });
     }
   }
 
-  return new Response(JSON.stringify({ scored, errors }), {
-    headers: { "Content-Type": "application/json" },
-  });
+  const batch = pending.slice(0, limitPairs);
+  let scored = 0;
+  const errors: string[] = [];
+
+  for (const { notice, company } of batch) {
+    try {
+      const { score, rationale } = await scoreMatch(notice, company);
+      await supabase.from("notice_matches").insert({
+        notice_id: notice.id,
+        company_id: company.id,
+        relevance_score: score,
+        rationale,
+        model: MODEL,
+      });
+      scored++;
+    } catch (e) {
+      errors.push(`notice=${notice.id} company=${company.id}: ${String(e)}`);
+    }
+  }
+
+  return new Response(
+    JSON.stringify({ scored, remaining: pending.length - batch.length, errors }),
+    { headers: { "Content-Type": "application/json", ...CORS_HEADERS } }
+  );
 });

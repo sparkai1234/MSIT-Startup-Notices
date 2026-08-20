@@ -69,7 +69,98 @@ body {
   padding: 40px 24px 80px;
 }
 
-.wrap { max-width: 920px; margin: 0 auto; }
+.wrap { max-width: 1200px; margin: 0 auto; }
+
+.layout { display: flex; gap: 28px; align-items: flex-start; }
+.main { flex: 1; min-width: 0; }
+
+.sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 24px;
+}
+.sidebar h2 {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin: 0 0 12px;
+}
+.company-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.company-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 11px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 13px;
+}
+.company-item.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+}
+.company-item .name { font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.company-item .del {
+  color: var(--muted);
+  font-size: 12px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  flex-shrink: 0;
+}
+.company-item .del:hover { color: #b23b3b; }
+.company-item.all { font-weight: 600; }
+
+.sidebar-actions { display: flex; flex-direction: column; gap: 6px; }
+.sidebar-actions button {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+.sidebar-actions button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+
+.company-form {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.company-form[hidden] { display: none; }
+.company-form input, .company-form textarea {
+  padding: 7px 9px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 12.5px;
+  font-family: inherit;
+  resize: vertical;
+}
+.company-form .row { display: flex; gap: 6px; }
+.company-form .row > * { flex: 1; }
+
+@media (max-width: 860px) {
+  .layout { flex-direction: column; }
+  .sidebar { width: 100%; position: static; }
+}
 
 header { margin-bottom: 28px; }
 .eyebrow {
@@ -286,6 +377,33 @@ select#companyFilter {
   margin: 10px 0 -6px;
 }
 
+.pagination {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.page-info { color: var(--muted); font-size: 12.5px; }
+.page-buttons { display: flex; gap: 4px; align-items: center; }
+.page-btn {
+  min-width: 30px;
+  height: 30px;
+  padding: 0 6px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 12.5px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.page-btn.active { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
+.page-btn:disabled { opacity: 0.4; cursor: default; }
+.page-ellipsis { color: var(--muted); padding: 0 2px; font-size: 12.5px; }
+
 @media (max-width: 520px) {
   select#companyFilter { margin-left: 0; width: 100%; }
   .search-row { flex-wrap: wrap; }
@@ -301,24 +419,46 @@ select#companyFilter {
     <p class="sub">과학기술정보통신부 사업공고를 자동 수집하고, 예산·자격·마감일을 추출해 포트폴리오사와의 적합도를 AI로 채점합니다.</p>
   </header>
 
-  <div class="search-row">
-    <input type="text" id="searchInput" placeholder="무엇을 찾고 계신가요? (예: GPU 지원, 블록체인 스타트업 바우처, 해외 진출 지원)" />
-    <button id="searchBtn" type="button">검색</button>
-    <button id="searchClearBtn" type="button" class="ghost" hidden>지우기</button>
-  </div>
+  <div class="layout">
+    <aside class="sidebar">
+      <h2>포트폴리오사</h2>
+      <div class="company-list" id="companyList">
+        <div class="company-item all active" data-id="">전체 공고 보기</div>
+      </div>
+      <div class="sidebar-actions">
+        <button id="addCompanyBtn" type="button">+ 회사 추가</button>
+        <button id="runMatchBtn" type="button" class="primary">매칭 실행</button>
+      </div>
+      <div class="company-form" id="companyForm" hidden>
+        <p style="font-size:11.5px;color:var(--muted);margin:0 0 2px;line-height:1.5;">한 줄에 한 회사씩, <strong>회사명: 회사 소개</strong> 형식으로 붙여넣으세요. 소개가 구체적일수록 매칭이 정확해집니다.</p>
+        <textarea id="cfBulk" placeholder="예)
+Acme Inc.: GPU 클라우드 인프라를 제공하는 AI 스타트업
+Beta Corp.: 블록체인 기반 결제 솔루션 스타트업" rows="6"></textarea>
+        <div class="row">
+          <button type="button" id="cfSave" class="primary" style="border:1px solid var(--accent);border-radius:8px;padding:7px;font-weight:600;cursor:pointer;">추가</button>
+          <button type="button" id="cfCancel" style="border:1px solid var(--border);border-radius:8px;padding:7px;background:var(--bg);cursor:pointer;">취소</button>
+        </div>
+      </div>
+    </aside>
 
-  <div class="controls">
-    <div class="tabs" id="statusTabs">
-      <button class="tab active" data-status="">전체</button>
-      <button class="tab" data-status="open">접수중</button>
-      <button class="tab" data-status="closed">마감</button>
+    <div class="main">
+      <div class="search-row">
+        <input type="text" id="searchInput" placeholder="무엇을 찾고 계신가요? (예: GPU 지원, 블록체인 스타트업 바우처, 해외 진출 지원)" />
+        <button id="searchBtn" type="button">검색</button>
+        <button id="searchClearBtn" type="button" class="ghost" hidden>지우기</button>
+      </div>
+
+      <div class="controls">
+        <div class="tabs" id="statusTabs">
+          <button class="tab active" data-status="">전체</button>
+          <button class="tab" data-status="open">접수중</button>
+          <button class="tab" data-status="closed">마감</button>
+        </div>
+      </div>
+
+      <div class="list" id="list"><div class="empty">불러오는 중…</div></div>
     </div>
-    <select id="companyFilter">
-      <option value="">전체 공고 보기</option>
-    </select>
   </div>
-
-  <div class="list" id="list"><div class="empty">불러오는 중…</div></div>
 </div>
 
 <script>
@@ -328,6 +468,8 @@ const ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 let currentStatus = "";
 let currentCompany = "";
 let activeSearch = null; // { query, results } when a semantic search is active
+let currentPage = 1;
+const PAGE_SIZE = 20;
 
 async function semanticSearch(query) {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/search-notices`, {
@@ -347,6 +489,29 @@ async function sb(path) {
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
+}
+
+// PostgREST caps each response at 1000 rows regardless of ?limit, so page through
+// with Range headers to get everything.
+async function sbAll(path) {
+  const pageSize = 1000;
+  let offset = 0;
+  let all = [];
+  while (true) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+      headers: {
+        apikey: ANON_KEY,
+        Authorization: `Bearer ${ANON_KEY}`,
+        Range: `${offset}-${offset + pageSize - 1}`,
+      },
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const page = await res.json();
+    all = all.concat(page);
+    if (page.length < pageSize) break;
+    offset += pageSize;
+  }
+  return all;
 }
 
 function scoreClass(s) {
@@ -381,19 +546,47 @@ function dDayLabel(deadline) {
   return days === 0 ? "D-day" : `D-${days}`;
 }
 
+async function sbWrite(path, method, body) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    method,
+    headers: {
+      apikey: ANON_KEY,
+      Authorization: `Bearer ${ANON_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+let companies = [];
+
 async function loadCompanies() {
   try {
-    const companies = await sb("portfolio_companies?select=id,name&active=eq.true&order=name");
-    const sel = document.getElementById("companyFilter");
-    for (const c of companies) {
-      const opt = document.createElement("option");
-      opt.value = c.id;
-      opt.textContent = c.name + " 매칭 보기";
-      sel.appendChild(opt);
-    }
+    companies = await sb("portfolio_companies?select=*&active=eq.true&order=name");
   } catch (e) {
     console.error(e);
+    companies = [];
   }
+  renderCompanyList();
+}
+
+function renderCompanyList() {
+  const listEl = document.getElementById("companyList");
+  const allActive = currentCompany === "" ? "active" : "";
+  listEl.innerHTML =
+    `<div class="company-item all ${allActive}" data-id="">전체 공고 보기</div>` +
+    companies
+      .map(
+        (c) => `
+      <div class="company-item ${String(c.id) === String(currentCompany) ? "active" : ""}" data-id="${c.id}">
+        <span class="name">${escapeHtml(c.name)}</span>
+        <button class="del" data-del-id="${c.id}" title="삭제">✕</button>
+      </div>`
+      )
+      .join("");
 }
 
 function factRow(label, value) {
@@ -410,12 +603,12 @@ async function render() {
     if (activeSearch) {
       notices = activeSearch.results;
     } else if (currentCompany) {
-      const matches = await sb(
-        `notice_matches?select=notice_id,relevance_score,rationale,notices(*)&company_id=eq.${currentCompany}&order=relevance_score.desc&limit=150`
+      const matches = await sbAll(
+        `notice_matches?select=notice_id,relevance_score,rationale,notices(*)&company_id=eq.${currentCompany}&order=relevance_score.desc`
       );
       notices = matches.filter((m) => m.notices).map((m) => ({ ...m.notices, relevance_score: m.relevance_score, rationale: m.rationale }));
     } else {
-      notices = await sb(`notices?select=*&order=posted_at.desc&limit=150`);
+      notices = await sbAll(`notices?select=*&order=posted_at.desc`);
     }
   } catch (e) {
     listEl.innerHTML = `<div class="empty">불러오기 실패: ${escapeHtml(e.message)}</div>`;
@@ -433,7 +626,11 @@ async function render() {
     return;
   }
 
-  listEl.innerHTML = searchStatusHtml + notices.map((n) => {
+  const totalPages = Math.max(1, Math.ceil(notices.length / PAGE_SIZE));
+  currentPage = Math.min(Math.max(1, currentPage), totalPages);
+  const pageNotices = notices.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  listEl.innerHTML = searchStatusHtml + pageNotices.map((n) => {
     const status = computeStatus(n);
     const dDay = status === "open" ? dDayLabel(n.application_deadline) : null;
     const facts = [
@@ -466,7 +663,36 @@ async function render() {
       ${n.extraction_notes ? `<div class="notes">${escapeHtml(n.extraction_notes)}</div>` : ""}
     </div>
   `;
-  }).join("");
+  }).join("") + paginationHtml(totalPages, notices.length);
+}
+
+function paginationHtml(totalPages, totalCount) {
+  if (totalPages <= 1) return "";
+  const pages = [];
+  for (let p = 1; p <= totalPages; p++) {
+    if (p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2) {
+      pages.push(p);
+    } else if (pages[pages.length - 1] !== "…") {
+      pages.push("…");
+    }
+  }
+  const buttons = pages
+    .map((p) =>
+      p === "…"
+        ? `<span class="page-ellipsis">…</span>`
+        : `<button class="page-btn ${p === currentPage ? "active" : ""}" data-page="${p}">${p}</button>`
+    )
+    .join("");
+  return `
+    <div class="pagination">
+      <span class="page-info">전체 ${totalCount}건 · ${currentPage}/${totalPages}페이지</span>
+      <div class="page-buttons">
+        <button class="page-btn" data-page="${currentPage - 1}" ${currentPage === 1 ? "disabled" : ""}>‹</button>
+        ${buttons}
+        <button class="page-btn" data-page="${currentPage + 1}" ${currentPage === totalPages ? "disabled" : ""}>›</button>
+      </div>
+    </div>
+  `;
 }
 
 document.getElementById("statusTabs").addEventListener("click", (e) => {
@@ -475,12 +701,110 @@ document.getElementById("statusTabs").addEventListener("click", (e) => {
   document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
   tab.classList.add("active");
   currentStatus = tab.dataset.status;
+  currentPage = 1;
   render();
 });
 
-document.getElementById("companyFilter").addEventListener("change", (e) => {
-  currentCompany = e.target.value;
+document.getElementById("companyList").addEventListener("click", (e) => {
+  const delBtn = e.target.closest(".del");
+  if (delBtn) {
+    e.stopPropagation();
+    deleteCompany(delBtn.dataset.delId);
+    return;
+  }
+  const item = e.target.closest(".company-item");
+  if (!item) return;
+  currentCompany = item.dataset.id;
+  currentPage = 1;
+  renderCompanyList();
   render();
+});
+
+async function deleteCompany(id) {
+  if (!confirm("이 회사를 삭제하시겠습니까? 매칭 기록도 함께 삭제됩니다.")) return;
+  try {
+    await sbWrite(`portfolio_companies?id=eq.${id}`, "DELETE");
+    if (String(currentCompany) === String(id)) currentCompany = "";
+    await loadCompanies();
+    render();
+  } catch (e) {
+    alert("삭제 실패: " + e.message);
+  }
+}
+
+document.getElementById("addCompanyBtn").addEventListener("click", () => {
+  document.getElementById("companyForm").hidden = false;
+});
+document.getElementById("cfCancel").addEventListener("click", () => {
+  document.getElementById("companyForm").hidden = true;
+});
+document.getElementById("cfSave").addEventListener("click", async () => {
+  const raw = document.getElementById("cfBulk").value;
+  const rows = raw
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const idx = line.indexOf(":");
+      if (idx === -1) return { name: line, description: null };
+      return { name: line.slice(0, idx).trim(), description: line.slice(idx + 1).trim() || null };
+    })
+    .filter((r) => r.name);
+
+  if (!rows.length) {
+    alert("회사명을 한 줄 이상 입력해주세요.");
+    return;
+  }
+
+  try {
+    await sbWrite("portfolio_companies", "POST", rows);
+    document.getElementById("cfBulk").value = "";
+    document.getElementById("companyForm").hidden = true;
+    await loadCompanies();
+  } catch (e) {
+    alert("저장 실패: " + e.message);
+  }
+});
+
+document.getElementById("runMatchBtn").addEventListener("click", async (e) => {
+  const btn = e.target;
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  let totalScored = 0;
+
+  try {
+    while (true) {
+      btn.textContent = `매칭 실행 중… (${totalScored}건 완료)`;
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/match-notices`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ limitPairs: 15 }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      if (data.message) {
+        alert(data.message);
+        break;
+      }
+      totalScored += data.scored ?? 0;
+      if (!data.remaining) break;
+    }
+    alert(`매칭 완료: 총 ${totalScored}건 신규 매칭됨`);
+    render();
+  } catch (e) {
+    alert(`매칭 실행 실패 (지금까지 ${totalScored}건 완료): ` + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+});
+
+document.getElementById("list").addEventListener("click", (e) => {
+  const btn = e.target.closest(".page-btn");
+  if (!btn || btn.disabled) return;
+  currentPage = parseInt(btn.dataset.page, 10);
+  render();
+  document.querySelector(".main").scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
 async function runSearch() {
@@ -495,6 +819,7 @@ async function runSearch() {
   try {
     const results = await semanticSearch(query);
     activeSearch = { query, results };
+    currentPage = 1;
   } catch (e) {
     listEl.innerHTML = `<div class="empty">검색 실패: ${escapeHtml(e.message)}</div>`;
     return;
@@ -508,6 +833,7 @@ document.getElementById("searchInput").addEventListener("keydown", (e) => {
 });
 document.getElementById("searchClearBtn").addEventListener("click", () => {
   activeSearch = null;
+  currentPage = 1;
   document.getElementById("searchInput").value = "";
   document.getElementById("searchClearBtn").hidden = true;
   render();
