@@ -599,16 +599,17 @@ async function render() {
   listEl.innerHTML = '<div class="empty">불러오는 중…</div>';
 
   let notices = [];
+  const cutoff = new Date(Date.now() - 1095 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   try {
     if (activeSearch) {
       notices = activeSearch.results;
     } else if (currentCompany) {
       const matches = await sbAll(
-        `notice_matches?select=notice_id,relevance_score,rationale,notices(*)&company_id=eq.${currentCompany}&order=relevance_score.desc`
+        `notice_matches?select=notice_id,relevance_score,rationale,notices(*)&company_id=eq.${currentCompany}&notices.posted_at=gte.${cutoff}&order=relevance_score.desc`
       );
       notices = matches.filter((m) => m.notices).map((m) => ({ ...m.notices, relevance_score: m.relevance_score, rationale: m.rationale }));
     } else {
-      notices = await sbAll(`notices?select=*&order=posted_at.desc`);
+      notices = await sbAll(`notices?select=*&posted_at=gte.${cutoff}&order=posted_at.desc`);
     }
   } catch (e) {
     listEl.innerHTML = `<div class="empty">불러오기 실패: ${escapeHtml(e.message)}</div>`;
