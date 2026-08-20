@@ -8,10 +8,8 @@ const MODEL = "gemini-3.6-flash";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "content-type, authorization, x-admin-secret",
+  "Access-Control-Allow-Headers": "content-type, authorization",
 };
-
-const ADMIN_SECRET = Deno.env.get("ADMIN_SECRET");
 
 async function scoreMatch(notice: any, company: any) {
   const prompt = `You evaluate whether a Korean government (MSIT) notice is relevant to a startup.
@@ -52,9 +50,6 @@ Respond ONLY with JSON: {"score": <int>, "rationale": "<one sentence in Korean>"
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
-  if (ADMIN_SECRET && req.headers.get("x-admin-secret") !== ADMIN_SECRET) {
-    return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: CORS_HEADERS });
-  }
 
   let params: { limitPairs?: number; noticeLimit?: number } = {};
   try {

@@ -819,7 +819,13 @@ document.getElementById("runMatchBtn").addEventListener("click", async (e) => {
   try {
     while (true) {
       btn.textContent = `매칭 실행 중… (${totalScored}건 완료)`;
-      const data = await callProtected("match-notices", { limitPairs: 15 });
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/match-notices`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ limitPairs: 15 }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
       if (data.message) {
         alert(data.message);
         break;
