@@ -41,7 +41,13 @@ function noticeToEmbeddingText(n: any): string {
     .join("\n");
 }
 
+const ADMIN_SECRET = Deno.env.get("ADMIN_SECRET");
+
 Deno.serve(async (req: Request) => {
+  if (ADMIN_SECRET && req.headers.get("x-admin-secret") !== ADMIN_SECRET) {
+    return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 });
+  }
+
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
   let params: { limit?: number; sinceDays?: number } = {};

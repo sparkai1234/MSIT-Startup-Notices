@@ -574,19 +574,29 @@ function dDayLabel(deadline) {
   return days === 0 ? "D-day" : `D-${days}`;
 }
 
-async function sbWrite(path, method, body) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    method,
-    headers: {
-      apikey: ANON_KEY,
-      Authorization: `Bearer ${ANON_KEY}`,
-      "Content-Type": "application/json",
-      Prefer: "return=representation",
-    },
-    body: body ? JSON.stringify(body) : undefined,
+function getAdminSecret() {
+  let secret = localStorage.getItem("adminSecret");
+  if (!secret) {
+    secret = prompt("관리자 비밀번호를 입력하세요 (포트폴리오 편집·매칭 실행에 필요):");
+    if (secret) localStorage.setItem("adminSecret", secret);
+  }
+  return secret;
+}
+
+async function callProtected(fnName, body) {
+  const secret = getAdminSecret();
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/${fnName}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-admin-secret": secret || "" },
+    body: JSON.stringify(body ?? {}),
   });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  if (res.status === 401) {
+    localStorage.removeItem("adminSecret");
+    throw new Error("비밀번호가 올바르지 않습니다. 다시 시도해주세요.");
+  }
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data;
 }
 
 let companies = [];
@@ -757,7 +767,7 @@ document.getElementById("companyList").addEventListener("click", (e) => {
 async function deleteCompany(id) {
   if (!confirm("이 회사를 삭제하시겠습니까? 매칭 기록도 함께 삭제됩니다.")) return;
   try {
-    await sbWrite(`portfolio_companies?id=eq.${id}`, "DELETE");
+    await callProtected("manage-portfolio", { action: "delete", id: Number(id) });
     if (String(currentCompany) === String(id)) currentCompany = "";
     await loadCompanies();
     render();
@@ -791,7 +801,7 @@ document.getElementById("cfSave").addEventListener("click", async () => {
   }
 
   try {
-    await sbWrite("portfolio_companies", "POST", rows);
+    await callProtected("manage-portfolio", { action: "add", companies: rows });
     document.getElementById("cfBulk").value = "";
     document.getElementById("companyForm").hidden = true;
     await loadCompanies();
@@ -809,13 +819,7 @@ document.getElementById("runMatchBtn").addEventListener("click", async (e) => {
   try {
     while (true) {
       btn.textContent = `매칭 실행 중… (${totalScored}건 완료)`;
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/match-notices`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ limitPairs: 15 }),
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
+      const data = await callProtected("match-notices", { limitPairs: 15 });
       if (data.message) {
         alert(data.message);
         break;
