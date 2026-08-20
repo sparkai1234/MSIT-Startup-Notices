@@ -609,7 +609,7 @@ async function render() {
       );
       notices = matches.filter((m) => m.notices).map((m) => ({ ...m.notices, relevance_score: m.relevance_score, rationale: m.rationale }));
     } else {
-      notices = await sbAll(`notices?select=*&posted_at=gte.${cutoff}&order=posted_at.desc`);
+      notices = await sbAll(`notices?select=*&posted_at=gte.${cutoff}&order=posted_at.desc,ntt_seq_no.desc`);
     }
   } catch (e) {
     listEl.innerHTML = `<div class="empty">불러오기 실패: ${escapeHtml(e.message)}</div>`;
