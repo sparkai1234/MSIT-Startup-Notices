@@ -30,30 +30,66 @@ function decodeXmlEntities(s: string): string {
     .replace(/&amp;/g, "&");
 }
 
-// hwpx section XML: text lives in <hp:t> runs inside <hp:p> paragraphs.
+const RUN_RE = /<hp:t(?:\s[^>]*)?>([^<]*)<\/hp:t>/g;
+
+function runText(chunk: string): string {
+  let text = "";
+  let m: RegExpExecArray | null;
+  RUN_RE.lastIndex = 0;
+  while ((m = RUN_RE.exec(chunk)) !== null) text += m[1];
+  return decodeXmlEntities(text).trim();
+}
+
+function paragraphsToLines(xml: string): string[] {
+  const lines: string[] = [];
+  for (const p of xml.split(/<hp:p\s/)) {
+    const line = runText(p);
+    if (line) lines.push(line);
+  }
+  return lines;
+}
+
+// A schedule/deadline is often in a table (<hp:tbl>/<hp:tr>/<hp:tc>), not plain prose.
+// Flattening every <hp:p> in document order scrambles header cells and value cells
+// together, losing which date belongs to which phase — so tables are rendered as
+// "col1 | col2 | ..." rows instead, matching how the source actually pairs them.
+function tableToText(tblXml: string): string {
+  const rows: string[] = [];
+  const rowRe = /<hp:tr[^>]*>([\s\S]*?)<\/hp:tr>/g;
+  const cellRe = /<hp:tc[^>]*>([\s\S]*?)<\/hp:tc>/g;
+  let rowMatch: RegExpExecArray | null;
+  while ((rowMatch = rowRe.exec(tblXml)) !== null) {
+    const cells: string[] = [];
+    let cellMatch: RegExpExecArray | null;
+    cellRe.lastIndex = 0;
+    while ((cellMatch = cellRe.exec(rowMatch[1])) !== null) {
+      cells.push(paragraphsToLines(cellMatch[1]).join(" "));
+    }
+    if (cells.some(Boolean)) rows.push(cells.join(" | "));
+  }
+  return rows.length ? "[표]\n" + rows.join("\n") : "";
+}
+
+// hwpx section XML: text lives in <hp:t> runs inside <hp:p> paragraphs, with
+// <hp:tbl> tables needing separate row/column-aware handling (see tableToText).
 // Preview/PrvText.txt is capped short, so read the full section body instead.
 function hwpxSectionXmlToText(xml: string): string {
-  const paragraphs = xml.split(/<hp:p\s/);
+  const parts = xml.split(/(<hp:tbl[\s\S]*?<\/hp:tbl>)/);
   const lines: string[] = [];
-  const runRe = /<hp:t(?:\s[^>]*)?>([^<]*)<\/hp:t>/g;
-  for (const p of paragraphs) {
-    let line = "";
-    let m: RegExpExecArray | null;
-    runRe.lastIndex = 0;
-    while ((m = runRe.exec(p)) !== null) line += m[1];
-    line = decodeXmlEntities(line).trim();
-    if (line) lines.push(line);
+  for (const part of parts) {
+    if (part.startsWith("<hp:tbl")) {
+      const rendered = tableToText(part);
+      if (rendered) lines.push(rendered);
+    } else {
+      lines.push(...paragraphsToLines(part));
+    }
   }
   return lines.join("\n");
 }
 
-async function extractHwpxText(url: string): Promise<string | null> {
+async function hwpxBufferToText(buf: ArrayBuffer): Promise<string | null> {
   try {
-    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
-    if (!res.ok) return null;
-    const buf = await res.arrayBuffer();
     const zip = await JSZip.loadAsync(buf);
-
     const sectionFiles = Object.keys(zip.files)
       .filter((name) => /^Contents\/section\d+\.xml$/.test(name))
       .sort();
@@ -71,14 +107,58 @@ async function extractHwpxText(url: string): Promise<string | null> {
   }
 }
 
+async function extractHwpxText(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+    if (!res.ok) return null;
+    return await hwpxBufferToText(await res.arrayBuffer());
+  } catch {
+    return null;
+  }
+}
+
+// Announcement docs are sometimes bundled inside a plain .zip alongside forms/regs
+// instead of being attached directly as .hwpx — open the zip and pull out any .hwpx
+// files nested inside it too.
+async function extractHwpxFromZipUrl(url: string): Promise<{ name: string; text: string }[]> {
+  try {
+    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+    if (!res.ok) return [];
+    const outerZip = await JSZip.loadAsync(await res.arrayBuffer());
+    const innerHwpxNames = Object.keys(outerZip.files).filter((name) => name.toLowerCase().endsWith(".hwpx"));
+
+    const found: { name: string; text: string }[] = [];
+    for (const name of innerHwpxNames.slice(0, 2)) {
+      const innerBuf = await outerZip.file(name)!.async("arraybuffer");
+      const text = await hwpxBufferToText(innerBuf);
+      if (text) found.push({ name, text });
+    }
+    return found;
+  } catch {
+    return [];
+  }
+}
+
 async function gatherAttachmentText(attachments: { name: string; url: string }[] | null): Promise<string> {
   if (!attachments || attachments.length === 0) return "";
-  const hwpx = attachments.filter((a) => a.name.toLowerCase().endsWith(".hwpx")).slice(0, 2);
+
   const parts: string[] = [];
-  for (const att of hwpx) {
+  const directHwpx = attachments.filter((a) => a.name.toLowerCase().endsWith(".hwpx")).slice(0, 2);
+  for (const att of directHwpx) {
     const text = await extractHwpxText(att.url);
     if (text) parts.push(`--- ${att.name} ---\n${text}`);
   }
+
+  if (parts.length === 0) {
+    const zips = attachments.filter((a) => a.name.toLowerCase().endsWith(".zip")).slice(0, 2);
+    for (const att of zips) {
+      const nested = await extractHwpxFromZipUrl(att.url);
+      for (const { name, text } of nested) {
+        parts.push(`--- ${att.name} > ${name} ---\n${text}`);
+      }
+    }
+  }
+
   return parts.join("\n\n").slice(0, 14000);
 }
 
@@ -105,7 +185,7 @@ Extract these fields as JSON (Korean text values, keep original units/currency a
   "selection_scale": "number of companies/projects to be selected",
   "project_period": "project execution period",
   "eligibility": "eligibility requirements to apply",
-  "application_deadline": "application deadline",
+  "application_deadline": "application deadline — check schedule/date TABLES (marked [표], rendered as 'col1 | col2 | ...' rows) as carefully as prose; look for rows labeled 접수마감/신청마감/마감일/신청기간/접수기간 and use the closing date of that period",
   "application_status": "upcoming | open | closed | unknown",
   "extraction_notes": "one short sentence noting anything important that doesn't fit the fields above (e.g. 'no attachment text was available'), or null"
 }
