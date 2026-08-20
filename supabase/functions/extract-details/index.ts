@@ -221,7 +221,7 @@ Deno.serve(async (req: Request) => {
     // defaults
   }
   const limit = params.limit ?? 20;
-  const sinceDays = params.sinceDays ?? 730; // outer safety net; real status comes from the deadline text itself
+  const sinceDays = params.sinceDays ?? 365; // outer safety net; real status comes from the deadline text itself
   const cutoff = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   // titles that are obviously not open applications (results/announcements about a past selection)

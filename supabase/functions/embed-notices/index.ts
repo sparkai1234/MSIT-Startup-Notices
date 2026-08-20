@@ -51,7 +51,7 @@ Deno.serve(async (req: Request) => {
     // defaults
   }
   const limit = params.limit ?? 30;
-  const sinceDays = params.sinceDays ?? 730;
+  const sinceDays = params.sinceDays ?? 365;
   const cutoff = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   const { data: notices, error } = await supabase
