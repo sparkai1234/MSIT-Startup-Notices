@@ -454,18 +454,7 @@ select#companyFilter {
         <div class="company-item all active" data-id="">전체 공고 보기</div>
       </div>
       <div class="sidebar-actions">
-        <button id="addCompanyBtn" type="button">+ 회사 추가</button>
         <button id="runMatchBtn" type="button" class="primary">매칭 실행</button>
-      </div>
-      <div class="company-form" id="companyForm" hidden>
-        <p style="font-size:11.5px;color:var(--muted);margin:0 0 2px;line-height:1.5;">한 줄에 한 회사씩, <strong>회사명: 회사 소개</strong> 형식으로 붙여넣으세요. 소개가 구체적일수록 매칭이 정확해집니다.</p>
-        <textarea id="cfBulk" placeholder="예)
-Acme Inc.: GPU 클라우드 인프라를 제공하는 AI 스타트업
-Beta Corp.: 블록체인 기반 결제 솔루션 스타트업" rows="6"></textarea>
-        <div class="row">
-          <button type="button" id="cfSave" class="primary" style="border:1px solid var(--accent);border-radius:8px;padding:7px;font-weight:600;cursor:pointer;">추가</button>
-          <button type="button" id="cfCancel" style="border:1px solid var(--border);border-radius:8px;padding:7px;background:var(--bg);cursor:pointer;">취소</button>
-        </div>
       </div>
     </aside>
 
@@ -775,40 +764,6 @@ async function deleteCompany(id) {
     alert("삭제 실패: " + e.message);
   }
 }
-
-document.getElementById("addCompanyBtn").addEventListener("click", () => {
-  document.getElementById("companyForm").hidden = false;
-});
-document.getElementById("cfCancel").addEventListener("click", () => {
-  document.getElementById("companyForm").hidden = true;
-});
-document.getElementById("cfSave").addEventListener("click", async () => {
-  const raw = document.getElementById("cfBulk").value;
-  const rows = raw
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const idx = line.indexOf(":");
-      if (idx === -1) return { name: line, description: null };
-      return { name: line.slice(0, idx).trim(), description: line.slice(idx + 1).trim() || null };
-    })
-    .filter((r) => r.name);
-
-  if (!rows.length) {
-    alert("회사명을 한 줄 이상 입력해주세요.");
-    return;
-  }
-
-  try {
-    await callProtected("manage-portfolio", { action: "add", companies: rows });
-    document.getElementById("cfBulk").value = "";
-    document.getElementById("companyForm").hidden = true;
-    await loadCompanies();
-  } catch (e) {
-    alert("저장 실패: " + e.message);
-  }
-});
 
 document.getElementById("runMatchBtn").addEventListener("click", async (e) => {
   const btn = e.target;
