@@ -599,7 +599,7 @@ async function render() {
   listEl.innerHTML = '<div class="empty">불러오는 중…</div>';
 
   let notices = [];
-  const cutoff = new Date(Date.now() - 1095 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const cutoff = new Date(Date.now() - 730 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   try {
     if (activeSearch) {
       notices = activeSearch.results;

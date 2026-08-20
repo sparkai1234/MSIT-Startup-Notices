@@ -44,18 +44,21 @@ function noticeToEmbeddingText(n: any): string {
 Deno.serve(async (req: Request) => {
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
-  let params: { limit?: number } = {};
+  let params: { limit?: number; sinceDays?: number } = {};
   try {
     params = await req.json();
   } catch {
     // defaults
   }
   const limit = params.limit ?? 30;
+  const sinceDays = params.sinceDays ?? 730;
+  const cutoff = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   const { data: notices, error } = await supabase
     .from("notices")
     .select("*")
     .is("embedding", null)
+    .gte("posted_at", cutoff)
     .order("posted_at", { ascending: false })
     .limit(limit);
 
