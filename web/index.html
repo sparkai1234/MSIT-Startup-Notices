@@ -453,9 +453,6 @@ select#companyFilter {
       <div class="company-list" id="companyList">
         <div class="company-item all active" data-id="">전체 공고 보기</div>
       </div>
-      <div class="sidebar-actions">
-        <button id="runMatchBtn" type="button" class="primary">매칭 실행</button>
-      </div>
     </aside>
 
     <div class="main">
@@ -764,39 +761,6 @@ async function deleteCompany(id) {
     alert("삭제 실패: " + e.message);
   }
 }
-
-document.getElementById("runMatchBtn").addEventListener("click", async (e) => {
-  const btn = e.target;
-  btn.disabled = true;
-  const originalText = btn.textContent;
-  let totalScored = 0;
-
-  try {
-    while (true) {
-      btn.textContent = `매칭 실행 중… (${totalScored}건 완료)`;
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/match-notices`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ limitPairs: 15 }),
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      if (data.message) {
-        alert(data.message);
-        break;
-      }
-      totalScored += data.scored ?? 0;
-      if (!data.remaining) break;
-    }
-    alert(`매칭 완료: 총 ${totalScored}건 신규 매칭됨`);
-    render();
-  } catch (e) {
-    alert(`매칭 실행 실패 (지금까지 ${totalScored}건 완료): ` + e.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = originalText;
-  }
-});
 
 document.getElementById("list").addEventListener("click", (e) => {
   const btn = e.target.closest(".page-btn");
