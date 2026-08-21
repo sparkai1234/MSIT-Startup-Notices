@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MSIT Notice Pipeline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;600;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root {
+  --ink: #1B2430;
+  --ink-soft: #384454;
+  --paper: #EEEFE7;
+  --surface: #F7F7F1;
+  --surface-2: #FFFFFF;
+  --border: #D8DACC;
+  --accent: #1F5F4F;
+  --accent-ink: #0F3A30;
+  --accent-soft: #DCE8E3;
+  --seal: #A6412F;
+  --seal-soft: #F1DDD6;
+  --muted: #6B7570;
+}
+
+:root:not([data-theme="light"]) {
+  @media (prefers-color-scheme: dark) {
+    --ink: #EDEFE9;
+    --ink-soft: #C7CDBF;
+    --paper: #14181A;
+    --surface: #1B211F;
+    --surface-2: #202826;
+    --border: #303B36;
+    --accent: #4FA88F;
+    --accent-ink: #BFE3D6;
+    --accent-soft: #1E332C;
+    --seal: #D97A63;
+    --seal-soft: #3A2420;
+    --muted: #8B968E;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ink: #EDEFE9;
+  --ink-soft: #C7CDBF;
+  --paper: #14181A;
+  --surface: #1B211F;
+  --surface-2: #202826;
+  --border: #303B36;
+  --accent: #4FA88F;
+  --accent-ink: #BFE3D6;
+  --accent-soft: #1E332C;
+  --seal: #D97A63;
+  --seal-soft: #3A2420;
+  --muted: #8B968E;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "IBM Plex Sans KR", "Inter", sans-serif;
+  font-size: 16px;
+  line-height: 1.65;
+  word-break: keep-all;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: var(--accent-soft); color: var(--accent-ink); }
+
+.mono {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+h1, h2, h3 {
+  font-family: "Noto Serif KR", serif;
+  text-wrap: balance;
+  word-break: keep-all;
+  margin: 0;
+  color: var(--ink);
+}
+
+a { color: var(--accent-ink); }
+
+/* ---------- progress rail ---------- */
+.rail {
+  position: fixed;
+  top: 0; left: 0;
+  height: 3px;
+  width: 0%;
+  background: var(--seal);
+  z-index: 50;
+  transition: width 0.1s linear;
+}
+
+/* ---------- cover ---------- */
+.cover {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 8vh 8vw;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--paper) 0%, var(--surface) 100%);
+}
+.cover::before {
+  content: "";
+  position: absolute;
+  top: -20%; right: -10%;
+  width: 60vw; height: 60vw;
+  max-width: 700px; max-height: 700px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  opacity: 0.5;
+}
+.cover::after {
+  content: "";
+  position: absolute;
+  top: -8%; right: 2%;
+  width: 46vw; height: 46vw;
+  max-width: 540px; max-height: 540px;
+  border-radius: 50%;
+  border: 1px dashed var(--border);
+  opacity: 0.5;
+}
+.cover-eyebrow {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--seal);
+  font-weight: 600;
+  margin-bottom: 22px;
+}
+.cover h1 {
+  font-size: clamp(38px, 6vw, 68px);
+  font-weight: 700;
+  line-height: 1.1;
+  max-width: 14ch;
+  position: relative;
+  z-index: 1;
+}
+.cover .sub {
+  margin-top: 22px;
+  max-width: 46ch;
+  font-size: 18px;
+  color: var(--ink-soft);
+  position: relative;
+  z-index: 1;
+  word-break: keep-all;
+}
+.presenter {
+  margin-top: 18px;
+  font-size: 13px;
+  letter-spacing: 0.03em;
+  color: var(--seal);
+  font-weight: 600;
+  position: relative;
+  z-index: 1;
+}
+.cover-meta {
+  margin-top: 48px;
+  display: flex;
+  gap: 52px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  color: var(--muted);
+  position: relative;
+  z-index: 1;
+}
+.cover-meta div { max-width: 30ch; line-height: 1.5; }
+.cover-meta strong { color: var(--ink); display: block; font-size: 15px; margin-bottom: 3px; }
+.scrolldown {
+  position: absolute;
+  bottom: 6vh; left: 8vw;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: bob 2.2s ease-in-out infinite;
+}
+@keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .scrolldown { animation: none; } }
+
+/* ---------- sections ---------- */
+section.doc {
+  padding: 100px 8vw;
+  border-top: 1px solid var(--border);
+  position: relative;
+}
+section.doc.alt { background: var(--surface); }
+
+.doc-head {
+  display: flex;
+  gap: 28px;
+  align-items: baseline;
+  max-width: 900px;
+  margin: 0 auto 46px;
+}
+.doc-num {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--seal);
+  border: 1px solid var(--seal);
+  border-radius: 50%;
+  width: 40px; height: 40px;
+  min-width: 40px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--seal-soft);
+}
+.doc-head h2 {
+  font-size: clamp(24px, 3vw, 34px);
+  font-weight: 600;
+}
+.doc-head .kr {
+  font-size: 15px;
+  color: var(--muted);
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+.doc-body {
+  max-width: 640px;
+  margin: 0 auto;
+}
+.doc-body.wide { max-width: 900px; }
+.doc-body p { color: var(--ink-soft); font-size: 16.5px; }
+.doc-body p + p { margin-top: 14px; }
+
+.lede {
+  font-size: 20px;
+  color: var(--ink);
+  font-weight: 500;
+  max-width: 640px;
+  margin: 0 auto 50px;
+  text-wrap: balance;
+  word-break: keep-all;
+}
+
+/* ---------- pill / tag ---------- */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 100px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.tag.seal { background: var(--seal-soft); color: var(--seal); }
+
+/* ---------- pipeline diagram ---------- */
+.pipeline {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  max-width: 960px;
+  margin: 0 auto;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.pstep {
+  padding: 28px 22px;
+  background: var(--surface-2);
+  border-right: 1px solid var(--border);
+  position: relative;
+}
+.pstep:last-child { border-right: none; }
+.pstep .time {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.pstep .time.seal { color: var(--seal); }
+.pstep.pending {
+  background: var(--surface);
+  border-left: 2px dashed var(--seal);
+}
+.pstep.pending h4 { color: var(--ink-soft); }
+.pstep h4 {
+  font-family: "Noto Serif KR", serif;
+  font-size: 18px;
+  margin: 10px 0 6px;
+  font-weight: 600;
+}
+.pstep p { font-size: 13.5px; color: var(--muted); margin: 0; line-height: 1.5; }
+.pstep::after {
+  content: "→";
+  position: absolute;
+  right: -13px; top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 16px;
+  z-index: 2;
+  background: var(--paper);
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+}
+.pstep:last-child::after { display: none; }
+@media (max-width: 760px) {
+  .pipeline { grid-template-columns: 1fr; }
+  .pstep { border-right: none; border-bottom: 1px solid var(--border); }
+  .pstep::after { content: "↓"; right: 50%; top: auto; bottom: -13px; transform: translateX(50%); }
+}
+
+/* ---------- stat grid ---------- */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1px;
+  max-width: 900px;
+  margin: 0 auto;
+  background: var(--border);
+  border: 1px solid var(--border);
+}
+.stat {
+  background: var(--surface-2);
+  padding: 26px 20px;
+}
+.stat .num {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 34px;
+  font-weight: 600;
+  color: var(--accent-ink);
+  line-height: 1;
+}
+.stat .label {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+/* ---------- comparison / before-after ---------- */
+.split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+@media (max-width: 700px) { .split { grid-template-columns: 1fr; } }
+.split3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+@media (max-width: 760px) { .split3 { grid-template-columns: 1fr; } }
+.card .stack { font-size: 14.5px; color: var(--ink-soft); }
+.card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 24px 26px;
+}
+.card h4 {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 0 0 12px;
+  font-weight: 600;
+}
+.card .code {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  color: var(--ink-soft);
+  white-space: pre-wrap;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+/* ---------- field table ---------- */
+.field-table {
+  max-width: 900px;
+  margin: 0 auto;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  overflow-x: auto;
+}
+.field-table table { width: 100%; border-collapse: collapse; min-width: 620px; }
+.field-table th {
+  text-align: left;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  padding: 12px 18px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.field-table td {
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14.5px;
+  color: var(--ink-soft);
+  background: var(--surface-2);
+}
+.field-table tr:last-child td { border-bottom: none; }
+.field-table td.fname { font-family: "IBM Plex Mono", monospace; font-size: 13px; color: var(--accent-ink); font-weight: 600; white-space: nowrap; }
+
+/* ---------- bug log ---------- */
+.buglist { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+.bug {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 20px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--border);
+}
+.bug:last-child { border-bottom: none; }
+.bug .status {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--seal);
+  align-self: start;
+  padding-top: 3px;
+}
+.bug h4 { font-size: 16px; margin: 0 0 6px; font-weight: 600; font-family: "IBM Plex Sans KR", sans-serif; }
+.bug p { margin: 0; font-size: 14.5px; color: var(--muted); }
+.bug p + p { margin-top: 8px; }
+.bug .fix { color: var(--accent-ink); font-weight: 500; }
+
+/* ---------- roadmap ---------- */
+.roadmap { max-width: 720px; margin: 0 auto; position: relative; }
+.rstep { display: grid; grid-template-columns: 32px 1fr; gap: 22px; padding-bottom: 44px; position: relative; }
+.rstep:last-child { padding-bottom: 0; }
+.rstep .dot {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--surface-2);
+  display: flex; align-items: center; justify-content: center;
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 600;
+  font-size: 13px;
+  z-index: 1;
+}
+.rstep:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 15px; top: 32px; bottom: -12px;
+  width: 1px;
+  background: var(--border);
+}
+.rstep h4 { font-size: 18px; margin: 3px 0 8px; font-weight: 600; }
+.rstep p { margin: 0; color: var(--muted); font-size: 14.5px; }
+
+/* ---------- explainer boxes ---------- */
+.explain {
+  max-width: 640px;
+  margin: 28px auto 0;
+  background: var(--accent-soft);
+  border-left: 3px solid var(--accent);
+  padding: 18px 22px;
+  border-radius: 0 4px 4px 0;
+}
+.explain .k { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent-ink); font-weight: 600; margin-bottom: 8px; }
+.explain p { margin: 0; font-size: 14.5px; color: var(--ink-soft); }
+
+/* ---------- closing ---------- */
+.closing {
+  min-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 10vh 8vw;
+  background: var(--ink);
+  color: var(--paper);
+}
+:root[data-theme="dark"] .closing, :root:not([data-theme="light"]) .closing {
+  @media (prefers-color-scheme: dark) { background: var(--surface-2); }
+}
+.closing .cover-eyebrow { color: var(--seal); }
+.closing h2 { color: var(--paper); font-size: clamp(28px, 4vw, 44px); max-width: 16ch; }
+.closing p { color: var(--muted); max-width: 46ch; margin-top: 18px; font-size: 16.5px; }
+
+footer.foot {
+  padding: 40px 8vw;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid var(--border);
+  background: var(--ink);
+}
+
+@media (max-width: 700px) {
+  section.doc { padding: 70px 6vw; }
+  .cover { padding: 8vh 6vw; }
+}
+</style>
+</head>
+<body>
+
+<div class="rail" id="rail"></div>
+
+<div class="cover">
+  <div class="cover-eyebrow">Sparklabs · Internal Presentation</div>
+  <h1>과기부 공고, 놓치지 않는 시스템을 만들었습니다</h1>
+  <p class="sub">API 없는 정부 사이트에서 스타트업 지원사업 공고를 자동으로 찾아내고, 이해하고, 우리 포트폴리오사와 연결하는 파이프라인.</p>
+  <p class="presenter mono">이종아 · 스파크랩 바이오 · Dartmouth College</p>
+  <div class="cover-meta">
+    <div><strong>542</strong>지난 1년 수집 공고</div>
+    <div><strong>539</strong>구조화 데이터로 정리된 공고<br>(예산·자격·마감일 등 자동 추출 완료)</div>
+    <div><strong>99.4%</strong>구조화 추출 성공률</div>
+  </div>
+  <div class="scrolldown">↓ SCROLL</div>
+</div>
+
+<section class="doc">
+  <div class="doc-head">
+    <div class="doc-num">1</div>
+    <div><h2>개요</h2><div class="kr">Overview</div></div>
+  </div>
+  <p class="lede">과학기술정보통신부(과기부)는 스타트업에게 중요한 사업공고를 지속적으로 게시하지만, 다른 정부 사이트와 달리 공개 API를 제공하지 않습니다.</p>
+  <div class="doc-body">
+    <p>중소벤처기업부, 특허청 등 기존에 연동해 온 사이트들은 API 키 발급을 통해 데이터를 자동으로 수집할 수 있습니다. 반면 과기부는 별도의 데이터 접근 창구가 없어, 신규 공고 여부를 담당자가 직접 사이트에 접속해 수작업으로 확인해야 했습니다.</p>
+    <p>이 프로젝트는 그 공백을 해결하기 위해 구축되었습니다. 시스템이 6시간 주기로 과기부 사이트를 자동 점검하고, 공고 내용을 분석해 구조화된 정보로 정리한 뒤, 포트폴리오사와의 관련성을 판단합니다.</p>
+  </div>
+  <div class="split" style="margin-top:40px;">
+    <div class="card">
+      <h4>이전 (Before)</h4>
+      <p class="stack">담당자가 과기부 사이트에 직접 접속해, 새 공고가 올라왔는지 눈으로 확인. 공고문을 열어 예산·자격·마감일을 일일이 읽고 정리.</p>
+    </div>
+    <div class="card">
+      <h4>이후 (After)</h4>
+      <p class="stack">시스템이 6시간마다 자동으로 확인하고, 필요한 정보를 구조화해 정리. 담당자는 검색·필터로 필요한 공고만 바로 확인.</p>
+    </div>
+  </div>
+</section>
+
+<section class="doc alt">
+  <div class="doc-head">
+    <div class="doc-num">2</div>
+    <div><h2>기술 인프라 구축</h2><div class="kr">Infrastructure — Supabase · GitHub · Vercel</div></div>
+  </div>
+  <p class="lede">파이프라인을 만들기 전, 세 플랫폼을 서로 연동해 하나의 시스템으로 묶는 기반 작업을 먼저 완료했습니다.</p>
+  <div class="split3">
+    <div class="card">
+      <h4>Supabase</h4>
+      <p class="stack">데이터베이스와 백엔드 자동화 작업(수집·추출·색인·매칭)을 모두 담당합니다.</p>
+    </div>
+    <div class="card">
+      <h4>GitHub</h4>
+      <p class="stack">모든 코드를 버전 관리하며, 변경 이력을 그대로 보존합니다.</p>
+    </div>
+    <div class="card">
+      <h4>Vercel</h4>
+      <p class="stack">실제 웹사이트를 배포하고, GitHub에 코드가 반영될 때마다 자동으로 최신 버전을 업데이트합니다.</p>
+    </div>
+  </div>
+</section>
+
+<section class="doc">
+  <div class="doc-head">
+    <div class="doc-num">3</div>
+    <div><h2>전체적 파이프라인 구조</h2><div class="kr">Full pipeline architecture</div></div>
+  </div>
+  <div class="pipeline">
+    <div class="pstep">
+      <div class="time mono">STEP 1</div>
+      <h4>수집 (Scrape)</h4>
+      <p>과기부 사업공고 게시판을 확인해, 새로 올라온 공고를 찾아 원문과 첨부파일을 가져옵니다.</p>
+    </div>
+    <div class="pstep">
+      <div class="time mono">STEP 2</div>
+      <h4>추출 (Extract)</h4>
+      <p>첨부된 .hwpx 공고문을 열어 전체 텍스트를 읽고, AI가 예산·자격·마감일 등을 구조화된 데이터로 정리합니다.</p>
+    </div>
+    <div class="pstep pending">
+      <div class="time mono seal">구축 완료 · 대기중</div>
+      <h4>색인 (Embed)</h4>
+      <p>공고 내용을 의미 벡터로 변환해, 키워드가 아닌 &ldquo;의미&rdquo;로 검색할 수 있게 하는 기능입니다. 시맨틱 검색 활성화 이후 본격 가동 예정입니다.</p>
+    </div>
+    <div class="pstep pending">
+      <div class="time mono seal">구축 완료 · 대기중</div>
+      <h4>매칭 (Match)</h4>
+      <p>각 공고를 포트폴리오사와 비교해 AI가 관련성 점수를 매기는 기능입니다. 포트폴리오사 목록 입력 후 가동 예정입니다.</p>
+    </div>
+  </div>
+</section>
+
+<section class="doc alt">
+  <div class="doc-head">
+    <div class="doc-num">4</div>
+    <div><h2>수집 범위</h2><div class="kr">Scope — why the last 1 year</div></div>
+  </div>
+  <div class="doc-body">
+    <p>수집 기간은 <strong>최근 1년</strong>으로 한정했습니다.</p>
+    <p>이 파이프라인은 매 단계에서 실제 AI(Gemini)를 호출합니다. 1년으로 좁힌 이유는 무제한으로 과거 공고를 처리하면 비용이 불필요하게 커지기 때문입니다. 하지만 시스템 자체는 유연하게 설계되어 있어, 필요할 시 2년, 3년, 또는 그 이전까지도 불러올 수 있습니다.</p>
+  </div>
+  <div class="stats" style="margin-top:40px;">
+    <div class="stat"><div class="num mono">542</div><div class="label">최근 1년 수집 공고 수</div></div>
+    <div class="stat"><div class="num mono">539</div><div class="label">구조화 데이터 추출 완료</div></div>
+    <div class="stat"><div class="num mono">389</div><div class="label">명시적 마감일 확보</div></div>
+    <div class="stat"><div class="num mono">63</div><div class="label">담당 부처·팀 수</div></div>
+  </div>
+  <div class="explain">
+    <div class="k mono">Cost awareness</div>
+    <p>실제로 초기 대량 처리(백필) 과정에서 API 사용량 한도에 도달해 일시적으로 처리가 중단된 적이 있었습니다. 그 경험을 반영해 처리 범위와 호출량을 의도적으로 제한하는 방향으로 설계했습니다 — 비용은 처리하는 공고 수에 비례해 늘어나므로, 필요한 범위 안에서만 운영하는 것이 중요합니다.</p>
+  </div>
+</section>
+
+<section class="doc">
+  <div class="doc-head">
+    <div class="doc-num">5</div>
+    <div><h2>정확도 검증</h2><div class="kr">Accuracy validation</div></div>
+  </div>
+  <p class="lede">542건을 전부 손으로 확인할 수는 없기 때문에, <span class="tag seal">무작위 표본 감사</span> 방식으로 정확도를 검증했습니다.</p>
+  <div class="doc-body">
+    <p>공고를 무작위로 골라 실제 과기부 원문·첨부파일과 하나하나 대조하는 방식입니다. 통계적으로는 <strong>단순 무작위 표본(simple random sampling)을 이용한 정확도 감사</strong>에 해당합니다.</p>
+    <p>이 과정에서 실제로 두 가지 추출 오류를 발견하고 고쳤습니다 (다음 섹션 참고). 또한 우리 사이트의 공고 정렬 순서가 <strong>실제 과기부 사이트와 완전히 동일한 순서</strong>로 나오는지도 확인했습니다 — 같은 날 올라온 공고끼리도 과기부가 매기는 게시글 번호(ntt_seq_no) 순서를 그대로 따르도록 맞췄습니다.</p>
+  </div>
+  <div class="explain">
+    <div class="k mono">Why this matters</div>
+    <p>표본 감사에서 발견한 오류는 실제로 코드에 반영해 542건 전체에 다시 적용했습니다 — 즉, 이 검증은 한 번의 점검이 아니라 실제로 데이터 품질을 끌어올린 과정이었습니다.</p>
+  </div>
+</section>
+
+<section class="doc alt">
+  <div class="doc-head">
+    <div class="doc-num">6</div>
+    <div><h2>발견한 문제와 해결</h2><div class="kr">Real bugs, found and fixed</div></div>
+  </div>
+  <div class="buglist">
+    <div class="bug">
+      <div class="status mono">FIXED</div>
+      <div>
+        <h4>신청기간 표의 마감일이 뒤섞여 &ldquo;미확인&rdquo;으로 표시됨</h4>
+        <p>많은 공고문이 신청기간을 표(表) 형식으로 제공합니다. 초기 버전은 문서를 문단 단위로만 읽었기 때문에, 표의 항목명(예: &ldquo;접수마감일&rdquo;)과 실제 날짜가 서로 분리된 채 저장되었습니다. 그 결과 실제로는 마감일이 명시되어 있는 공고인데도 사이트에는 &ldquo;미확인&rdquo;으로 표시되는 경우가 상당수 있었습니다.</p>
+        <p class="fix">→ 표의 행·열 구조를 그대로 인식해 항목명과 값을 정확히 짝지어 읽도록 파서를 재작성했습니다. 무작위 표본 재검사에서 정확도가 눈에 띄게 개선된 것을 확인했습니다.</p>
+      </div>
+    </div>
+    <div class="bug">
+      <div class="status mono">FIXED</div>
+      <div>
+        <h4>압축파일 속 공고문을 놓쳐 핵심 정보 누락</h4>
+        <p>일부 공고는 실제 공고문(.hwpx)이 첨부파일로 바로 노출되지 않고, 압축파일(.zip) 안에 들어있었습니다. 기존 시스템은 압축파일 내부를 열어보지 않았기 때문에, 예산·자격요건 같은 핵심 정보를 아예 가져오지 못하고 있었습니다.</p>
+        <p class="fix">→ 압축파일을 자동으로 열어 내부의 공고문을 찾아 추출하도록 개선했습니다.</p>
+      </div>
+    </div>
+    <div class="bug">
+      <div class="status mono">FIXED</div>
+      <div>
+        <h4>같은 날 등록된 공고 순서가 과기부와 다르게 표시됨</h4>
+        <p>과기부 사이트는 같은 날 등록된 공고끼리도 게시글 번호 순서를 정확히 지켜 보여줍니다. 초기 버전은 날짜만 기준으로 정렬했기 때문에, 같은 날짜 안에서는 순서가 뒤섞여 실제 사이트와 다르게 보이는 문제가 있었습니다.</p>
+        <p class="fix">→ 날짜가 같을 경우 과기부의 게시글 번호(ntt_seq_no)를 기준으로 2차 정렬하도록 수정해, 실제 사이트와 완전히 동일한 순서로 맞췄습니다.</p>
+      </div>
+    </div>
+    <div class="bug">
+      <div class="status mono">FIXED</div>
+      <div>
+        <h4>전체 공고 중 일부만 조회되던 문제</h4>
+        <p>사용하는 데이터베이스(Supabase)는 한 번의 요청으로 최대 1,000건까지만 반환합니다. 이 한계를 인지하지 못해, 실제로는 542건이 있는데도 화면에는 그 일부만 표시되는 경우가 있었습니다.</p>
+        <p class="fix">→ 페이지 단위로 나눠 요청하도록 로직을 수정해, 전체 데이터가 빠짐없이 조회되도록 했습니다.</p>
+      </div>
+    </div>
+    <div class="bug">
+      <div class="status mono">FIXED</div>
+      <div>
+        <h4>보안 점검에서 발견된 접근 권한 문제</h4>
+        <p>독립적인 보안 점검을 별도로 진행한 결과, 로그인 없이도 누구나 포트폴리오사 목록을 추가·수정·삭제할 수 있고, AI를 호출하는 핵심 기능도 제한 없이 실행할 수 있다는 점이 발견되었습니다. 방치할 경우 데이터 훼손이나 예상치 못한 비용 발생으로 이어질 수 있는 사안이었습니다.</p>
+        <p class="fix">→ 포트폴리오사 수정 권한과 핵심 자동화 기능에 별도의 관리자 인증을 도입해 접근을 제한했습니다.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="doc">
+  <div class="doc-head">
+    <div class="doc-num">7</div>
+    <div><h2>추출 항목</h2><div class="kr">What's extracted from every notice</div></div>
+  </div>
+  <div class="field-table">
+    <table>
+      <thead><tr><th>필드</th><th>설명</th></tr></thead>
+      <tbody>
+        <tr><td class="fname">total_budget</td><td>총 사업예산</td></tr>
+        <tr><td class="fname">support_cap_per_company</td><td>기업당 지원한도</td></tr>
+        <tr><td class="fname">self_funding_ratio</td><td>자기부담 비율</td></tr>
+        <tr><td class="fname">actual_support_amount</td><td>실질 지원금액</td></tr>
+        <tr><td class="fname">support_type / payment_method</td><td>지원 형태 및 지급 방식</td></tr>
+        <tr><td class="fname">selection_scale</td><td>선정 규모</td></tr>
+        <tr><td class="fname">project_period</td><td>사업 수행기간</td></tr>
+        <tr><td class="fname">eligibility</td><td>신청자격</td></tr>
+        <tr><td class="fname">application_deadline</td><td>신청 마감일</td></tr>
+        <tr><td class="fname">application_status</td><td>접수중 / 마감 (실시간 계산)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="explain" style="max-width:900px;">
+    <div class="k mono">How it's extracted</div>
+    <p>공고 원문과 첨부파일(.hwpx) 전체 텍스트를 AI(Gemini)에게 전달하고, 위 10개 항목에 맞춰 구조화된 형식으로 답하도록 요청하는 방식으로 이뤄집니다. 문서에 명시되지 않은 항목은 추측하지 않고 공란으로 남겨, 실제 공고 내용과 다른 값이 만들어지지 않도록 설계했습니다.</p>
+  </div>
+</section>
+
+<section class="doc alt">
+  <div class="doc-head">
+    <div class="doc-num">8</div>
+    <div><h2>인덱싱과 시맨틱 검색</h2><div class="kr">Currently in progress</div></div>
+  </div>
+  <p class="lede">Supabase·GitHub·Vercel 연동을 마친 지금, 다음 단계로 색인(indexing) 작업을 진행하고 있습니다.</p>
+  <div class="split">
+    <div class="card">
+      <h4>인덱싱이란</h4>
+      <p style="font-size:14.5px;color:var(--ink-soft);">책 뒤의 &ldquo;찾아보기&rdquo;와 같은 개념입니다. 색인이 없으면 원하는 내용을 찾기 위해 책 전체를 처음부터 읽어야 하지만, 색인이 있으면 바로 해당 페이지로 넘어갈 수 있습니다. 데이터베이스에서도 똑같이, 미리 정리된 색인 구조 덕분에 542건 전체를 하나씩 훑지 않고 원하는 결과로 바로 찾아갑니다.</p>
+    </div>
+    <div class="card">
+      <h4>시맨틱 검색이란</h4>
+      <p style="font-size:14.5px;color:var(--ink-soft);">공고 내용을 &ldquo;의미 벡터&rdquo;라는 숫자로 변환해두면, 검색할 때도 같은 방식으로 변환한 뒤 &ldquo;의미가 가장 가까운&rdquo; 공고를 찾을 수 있습니다. 그래서 &ldquo;GPU 지원&rdquo;이라고 검색하면, 그 단어가 본문에 없어도 실제로 GPU 관련 지원사업을 찾아냅니다.</p>
+    </div>
+  </div>
+  <div class="explain" style="max-width:900px;">
+    <div class="k mono">In this project</div>
+    <p>시맨틱 검색용 의미 벡터에는 이미 pgvector의 HNSW 색인을 적용해, 542건 중에서도 빠르게 검색되도록 구성했습니다. 지금은 같은 원리를 확장해, ① 마감일(application_deadline) 컬럼에 색인을 추가해 &ldquo;접수중&rdquo; 공고만 즉시 걸러내고, ② 담당 부처(dept) 컬럼에 색인을 추가해 부처별 조회 속도를 높이고, ③ 공고 상태(application_status)에 복합 색인을 적용해 페이지네이션 속도를 개선하는 작업을 진행하고 있습니다. 데이터가 수천, 수만 건으로 늘어나도 검색·조회 속도가 크게 느려지지 않는 구조를 만드는 것이 목표입니다.</p>
+  </div>
+</section>
+
+<section class="doc">
+  <div class="doc-head">
+    <div class="doc-num">9</div>
+    <div><h2>다음 단계</h2><div class="kr">Next steps</div></div>
+  </div>
+  <div class="roadmap">
+    <div class="rstep">
+      <div class="dot mono">1</div>
+      <div><h4>색인 작업 마무리 및 검증</h4><p>현재 진행 중인 Supabase 색인화 작업을 완료하고, 데이터가 늘어나도 속도가 유지되는지 확인합니다.</p></div>
+    </div>
+    <div class="rstep">
+      <div class="dot mono">2</div>
+      <div><h4>정확도·최신성 모니터링 도구</h4><p>색인 작업이 확인되면, 이 사이트의 데이터를 실제 과기부 사이트와 지속적으로 비교해 정확도와 최신성을 자동으로 점검하는 별도의 프로그램을 구축합니다 — 표본 감사를 사람이 반복하는 대신, 시스템이 스스로 확인하도록 만드는 단계입니다.</p></div>
+    </div>
+    <div class="rstep">
+      <div class="dot mono">3</div>
+      <div><h4>포트폴리오 매칭 활성화</h4><p>포트폴리오사 목록을 등록해 매칭 기능을 실제로 가동합니다. 등록 시 사업자등록증을 함께 첨부하면, AI가 업종·사업 형태 등 등록증 정보까지 반영해 더 정교한 관련성 판단을 하도록 확장할 계획입니다.</p></div>
+    </div>
+    <div class="rstep">
+      <div class="dot mono">4</div>
+      <div><h4>인수인계 문서화</h4><p>담당자가 바뀌더라도 시스템 구조와 접근 방법을 빠르게 파악할 수 있도록, 온보딩 문서를 이미 작성해두었습니다. GitHub·Supabase·Vercel 접근 방법, 주요 비밀값 위치, 파이프라인 동작 방식이 모두 정리되어 있습니다.</p></div>
+    </div>
+  </div>
+</section>
+
+<div class="closing">
+  <div class="cover-eyebrow">감사합니다</div>
+  <h2>질문 있으신가요?</h2>
+  <p>정부 공고 하나에도 생각보다 다양한 문서 형식과 예외가 숨어 있다는 걸 이번에 배웠습니다. 손이 많이 가는 작업이었던 만큼, 자동화의 필요성도 더 분명하게 느꼈습니다.</p>
+  <p>사이트는 지금도 6시간마다 자동으로 새 공고를 확인하고 있습니다.</p>
+</div>
+
+<footer class="foot">
+  <span>Sparklabs · Portfolio Intelligence</span>
+  <span>msit-startup-notices.vercel.app</span>
+</footer>
+
+<script>
+window.addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop) / (h.scrollHeight - h.clientHeight) * 100;
+  document.getElementById('rail').style.width = pct + '%';
+});
+</script>
+</body>
+</html>
